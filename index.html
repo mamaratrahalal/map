@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Карта с переключением изображений</title>
+    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+        }
+        
+        /* Мобильный адаптивный контейнер управления */
+        .controls-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 16px 20px;
+            padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
+        
+        .controls-container label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #222;
+            white-space: nowrap;
+            user-select: none;
+        }
+        
+        .opacity-slider {
+            width: 60%;
+            height: 8px;
+            cursor: pointer;
+            accent-color: #0078ff;
+            background: #e5e5ea;
+            border-radius: 4px;
+        }
+        
+        .image-select {
+            width: 60%;
+            padding: 10px 12px;
+            font-size: 14px;
+            font-weight: 600;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            background-color: white;
+            cursor: pointer;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23333' d='M0 0l5 5 5-5z'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+        }
+        .image-select:focus {
+            border-color: #0078ff;
+        }
+
+        .divider {
+            display: none;
+        }
+
+        @media (min-width: 600px) {
+            .controls-container {
+                bottom: 25px;
+                left: 50%;
+                right: auto;
+                transform: translateX(-50%);
+                flex-direction: row;
+                border-radius: 30px;
+                padding: 12px 24px;
+                width: auto;
+                max-width: 90%;
+            }
+            .control-group {
+                width: auto;
+                gap: 10px;
+            }
+            .image-select {
+                width: auto;
+                padding: 6px 28px 6px 12px;
+            }
+            .opacity-slider {
+                width: 130px;
+            }
+            .divider {
+                display: block;
+                width: 1px;
+                height: 20px;
+                background: #ccc;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="controls-container">
+    <div class="control-group">
+        <label for="imageSelect">Изображение</label>
+        <select id="imageSelect" class="image-select">
+            <option value="map" selected>map.bmp (Старое)</option>
+            <option value="pp">pp.png (Новое)</option>
+        </select>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="control-group">
+        <label for="opacitySlider">Прозрачность</label>
+        <input type="range" id="opacitySlider" class="opacity-slider" min="0" max="1" step="0.05" value="0.85">
+    </div>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+    // База данных изображений и их координат
+    const imageData = {
+        'map': {
+            url: 'map.bmp',
+            coords: [
+                [30.28886544453129, 50.5535844031125],
+                [30.716556052944817, 50.5535844031125],
+                [30.716556052944817, 50.30661702173966],
+                [30.28886544453129, 50.30661702173966]
+            ]
+        },
+        'pp': {
+            url: 'pp.png',
+            coords: [
+                [30.283687558394973, 50.535916464642874],
+                [30.814950582922307, 50.535916464642874],
+                [30.814950582922307, 50.3456884864621],
+                [30.283687558394973, 50.3456884864621]
+            ]
+        }
+    };
+
+    // Считываем текущее выбранное значение (теперь это 'map')
+    let currentKey = document.getElementById('imageSelect').value;
+    
+    function getCenter(coords) {
+        const lng = (coords[0][0] + coords[1][0]) / 2;
+        const lat = (coords[0][1] + coords[2][1]) / 2;
+        return [lng, lat];
+    }
+
+    const initialCenter = getCenter(imageData[currentKey].coords);
+
+    const map = new maplibregl.Map({
+        container: 'map',
+        style: {
+            version: 8,
+            sources: {
+                'google-satellite': {
+                    type: 'raster',
+                    tiles: ['https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}'],
+                    tileSize: 256,
+                    attribution: '&copy; Google Maps'
+                }
+            },
+            layers: [{ id: 'google-layer', type: 'raster', source: 'google-satellite' }]
+        },
+        center: initialCenter, 
+        zoom: 11 
+    });
+
+    map.addControl(new maplibregl.NavigationControl());
+
+    function switchOverlay(key) {
+        if (map.getLayer('fixed-overlay-layer')) map.removeLayer('fixed-overlay-layer');
+        if (map.getSource('fixed-overlay-source')) map.removeSource('fixed-overlay-source');
+
+        const data = imageData[key];
+
+        map.addSource('fixed-overlay-source', {
+            type: 'image',
+            url: data.url,
+            coordinates: data.coords
+        });
+
+        map.addLayer({
+            id: 'fixed-overlay-layer',
+            type: 'raster',
+            source: 'fixed-overlay-source',
+            paint: {
+                'raster-opacity': parseFloat(document.getElementById('opacitySlider').value)
+            }
+        });
+    }
+
+    map.on('load', () => {
+        // Запускает первую картинку (теперь это map.bmp)
+        switchOverlay(currentKey);
+
+        // Изменение прозрачности
+        document.getElementById('opacitySlider').addEventListener('input', (e) => {
+            if (map.getLayer('fixed-overlay-layer')) {
+                map.setPaintProperty('fixed-overlay-layer', 'raster-opacity', parseFloat(e.target.value));
+            }
+        });
+
+        // Переключение изображений
+        document.getElementById('imageSelect').addEventListener('change', (e) => {
+            currentKey = e.target.value;
+            
+            switchOverlay(currentKey);
+            
+            map.flyTo({
+                center: getCenter(imageData[currentKey].coords),
+                zoom: 11,
+                essential: true
+            });
+        });
+    });
+</script>
+
+</body>
+</html>
