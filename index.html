@@ -132,6 +132,7 @@
         <select id="imageSelect" class="image-select">
             <option value="map" selected>map.bmp (Старое)</option>
             <option value="pp">pp.png (Новое)</option>
+            <option value="lybed">lybed.png (Новое 3)</option>
         </select>
     </div>
 
@@ -164,10 +165,18 @@
                 [30.814950582922307, 50.3456884864621],
                 [30.283687558394973, 50.3456884864621]
             ]
+        },
+        'lybed': {
+            url: 'lybed.png',
+            coords: [
+                [30.37837015085773, 50.485794632146956],
+                [30.611921035008667, 50.485794632146956],
+                [30.611921035008667, 50.381352317781996],
+                [30.37837015085773, 50.381352317781996]
+            ]
         }
     };
 
-    // Считываем текущее выбранное значение (теперь это 'map')
     let currentKey = document.getElementById('imageSelect').value;
     
     function getCenter(coords) {
@@ -221,7 +230,6 @@
     }
 
     map.on('load', () => {
-        // Запускает первую картинку (теперь это map.bmp)
         switchOverlay(currentKey);
 
         // Изменение прозрачности
@@ -239,7 +247,7 @@
             
             map.flyTo({
                 center: getCenter(imageData[currentKey].coords),
-                zoom: 11,
+                zoom: 12, // Для lybed зум чуть побольше (12), так как область поменьше, будет красивее
                 essential: true
             });
         });
